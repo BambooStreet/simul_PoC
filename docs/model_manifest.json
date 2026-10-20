@@ -1,0 +1,10 @@
+{
+  "source": "https://github.com/dexmate-ai/dexmate-urdf",
+  "package": "dexmate-urdf",
+  "version": "0.8.4",
+  "license": "Apache-2.0",
+  "files": {
+    "vega_1.urdf": "ed78894414455cef49d07b92e2cb7076159633cfe09c1541616a7bfc1a6afbc5",
+    "vega_1.srdf": "fa3b5ed7e7d1fa89e0828c522e16fb6a6bf0ee07a8615b55b37dbf4ebd03113b"
+  }
+}

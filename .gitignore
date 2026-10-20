@@ -1,0 +1,9 @@
+.deps/
+__pycache__/
+work/
+assets/vega.xml
+assets/vega_collision.urdf
+assets/scene.xml
+reports/*.png
+.ruff_cache/
+assets/collision/

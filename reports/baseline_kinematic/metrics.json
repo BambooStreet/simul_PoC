@@ -1,0 +1,117 @@
+{
+  "model_fingerprint": {
+    "mujoco": "3.13.0",
+    "nbody": 80,
+    "njnt": 59,
+    "nq": 251,
+    "nv": 219,
+    "ngeom": 1563,
+    "nmesh": 38,
+    "nu": 0,
+    "neq": 64,
+    "nexclude": 131,
+    "ncam": 2,
+    "robot_collision_geoms": 47,
+    "robot_mass_kg": 142.1136,
+    "timestep": 0.005,
+    "urdf_sha256": "ed78894414455cef",
+    "world_collision_geoms": 3
+  },
+  "runs": [
+    {
+      "run": "run32_ordered_PASS",
+      "boxes": 32,
+      "placed": 32,
+      "counts": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "seed": 588073083,
+      "selection": "ordered",
+      "sim_seconds": 1341.625,
+      "sim_seconds_per_tote": 41.926,
+      "max_ik_component_error": 0.0002937234208948425,
+      "max_joint_speed_ratio": 0.8367084425881244,
+      "max_stack_drift_m": 0.014704373563178373,
+      "base_displacement_m": 0.0
+    },
+    {
+      "run": "run32_seed7_PASS",
+      "boxes": 32,
+      "placed": 32,
+      "counts": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "seed": 7,
+      "selection": "random",
+      "sim_seconds": 1341.785,
+      "sim_seconds_per_tote": 41.931,
+      "max_ik_component_error": 0.0002937029988232531,
+      "max_joint_speed_ratio": 0.8507449907934579,
+      "max_stack_drift_m": 0.013600392597761904,
+      "base_displacement_m": 0.0
+    },
+    {
+      "run": "run28_seed2_PASS",
+      "boxes": 28,
+      "placed": 28,
+      "counts": [
+        7,
+        7,
+        7,
+        7
+      ],
+      "seed": 2,
+      "selection": "random",
+      "sim_seconds": 1183.565,
+      "sim_seconds_per_tote": 42.27,
+      "max_ik_component_error": 0.00028496198257066396,
+      "max_joint_speed_ratio": 0.8640336103247862,
+      "max_stack_drift_m": 0.010524704261985396,
+      "base_displacement_m": 0.0
+    },
+    {
+      "run": "run32_seed2_FAIL",
+      "boxes": 32,
+      "placed": 30,
+      "counts": [
+        8,
+        7,
+        8,
+        7
+      ],
+      "seed": 2,
+      "selection": "random",
+      "sim_seconds": 1295.635,
+      "sim_seconds_per_tote": 43.188,
+      "max_ik_component_error": 0.00029372518586434637,
+      "max_joint_speed_ratio": 0.8684153399251918,
+      "max_stack_drift_m": 0.0,
+      "base_displacement_m": 0.0
+    },
+    {
+      "run": "run32_seed2_PRE_P0_PASS",
+      "boxes": 32,
+      "placed": 32,
+      "counts": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "seed": 2,
+      "selection": "random",
+      "sim_seconds": 1341.685,
+      "sim_seconds_per_tote": 41.928,
+      "max_ik_component_error": 0.00029372524118009835,
+      "max_joint_speed_ratio": 0.8661716370942343,
+      "max_stack_drift_m": 0.016381399508663977,
+      "base_displacement_m": 0.0
+    }
+  ]
+}
