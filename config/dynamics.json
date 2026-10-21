@@ -1,0 +1,66 @@
+{
+  "control": {
+    "omega_n": {
+      "value": 20.0, "unit": "rad/s", "source": "estimated",
+      "note": "목표 폐루프 고유진동수 3.2 Hz. 지령 궤적 대역폭이 1 Hz 미만이라 3배 여유. 실제 제어기 대역폭 자료 없음."
+    },
+    "zeta": {
+      "value": 1.0, "unit": "-", "source": "design_choice",
+      "note": "임계감쇠. 오버슈트 없이 가장 빠른 수렴."
+    },
+    "armature_beta": {
+      "value": 0.05, "unit": "-", "source": "estimated",
+      "note": "반사 로터 관성 / 링크 관성 비. 감속기 사양 미확보. beta in {0.025,0.05,0.10} 민감도 시험으로 방어."
+    },
+    "armature_absolute": {
+      "value": null, "unit": "kg m^2", "source": "design_choice",
+      "note": "null이면 max(beta*M_ii, 2*kp*dt^2, floor) 규칙을 쓴다. 값을 주면 전 관절에 그 절대값을 쓴다. 토크 포화 결론이 armature 산정 방식에 좌우되는지 보는 1회 비교용(0.1 kg m^2)."
+    },
+    "armature_floor": {
+      "value": 0.0001, "unit": "kg m^2", "source": "design_choice",
+      "note": "관성이 거의 0인 손목 관절의 수치 하한."
+    },
+    "explicit_damping": {
+      "value": true, "unit": "-", "source": "design_choice",
+      "note": "kv*(v_des - v)를 액추에이터로 내보내고 관절 damping은 0으로 둔다. damping으로 분리하면 kv*v_des가 액추에이터를 통과해 forcerange를 먹어버린다(torso_j2가 380 N·m에서 포화했다). dt=2 ms에서 명시적 kv*dt는 안정 한계 2(M+armature)의 3.8%만 쓴다."
+    },
+    "velocity_feedforward_tau": {
+      "value": 0.05, "unit": "s", "source": "design_choice",
+      "note": "속도 피드포워드 1차 저역통과 시정수 = 1/omega_n. 궤적이 구간별 선형(C0)이라 경계에서 v_des가 계단으로 뛰고, kv*dv가 그대로 토크 스파이크가 된다(torso_j2 380 N*m 순간 포화). 위치 지령은 손대지 않으므로 운동학 모드는 영향이 없다."
+    },
+    "payload_hands": {
+      "value": 2, "unit": "-", "source": "design_choice",
+      "note": "양손 후크가 적재물 하중을 균등 분담한다고 가정. 불균형은 피드백항이 맡는다."
+    }
+  },
+  "idealised": {
+    "omega_n": {
+      "value": 200.0, "unit": "rad/s", "source": "idealised",
+      "note": "base_yaw/head/wheel을 구속으로 유지하는 position 액추에이터 대역폭. forcerange 없음. 4단계에서 실제 구동/조향 모터로 교체."
+    }
+  },
+  "timestep": {
+    "kinematic": {
+      "value": 0.005, "unit": "s", "source": "design_choice",
+      "note": "reports/baseline_kinematic 동결 결과를 재현해야 하므로 고정."
+    },
+    "dynamic": {
+      "value": 0.002, "unit": "s", "source": "design_choice",
+      "note": "가장 뻣뻣한 관절에서 kp*dt^2가 M_ii의 0.16%. 3/4단계 접촉 도입 시 1 ms 재검토."
+    }
+  },
+  "contact": {
+    "penetration_limit_kinematic": {
+      "value": 0.003, "unit": "m", "source": "design_choice",
+      "note": "운동학에서는 관통이 곧 오류다."
+    },
+    "unheld_tote_contact_steps": {
+      "value": 0, "unit": "steps", "source": "measured_in_sim",
+      "note": "동역학 충돌 판정: 로봇이 들고 있지도 집는 중도 아닌 토트에 접촉한 스텝 수의 허용치. 허용 집합은 ik.ignore_bodies(들고 있는 토트 + 집는 중인 토트)다. MuJoCo의 포함 판정(dist < includemargin)을 그대로 쓴다 — 후크의 margin 4 mm가 그 쌍의 includemargin이므로 4 mm 안에 들어온 후크는 솔버가 실제로 접촉으로 처리한다. 8토트 정상 실행(347 s, 173k 스텝)에서 허용 집합 밖 접촉이 0건이었으므로 0으로 확정했다 — 관찰된 접촉은 전부 돌기와 손잡이 턱/림(engage()가 요구하는 것), 그리고 운반 중인 토트다. null로 두면 측정만 하고 예외를 던지지 않는다."
+    },
+    "penetration_limit_dynamic": {
+      "value": 0.009, "unit": "m", "source": "design_choice",
+      "note": "8토트 동역학 사이클에서 측정한 정상 최대 관통이 2.838 mm였고(scripts/verify_dynamics.py 기준 9), 그 3배로 잡았다. 우려했던 '운동학 3 mm에 정상 동작이 걸린다'는 실제로 일어나지 않았다 — 측정값이 3 mm 아래다. 그래도 솔버 관통은 자세·접촉 수에 따라 변하므로 여유를 둔다. 회피 여유 AVOID_REQUIRE 14 mm보다 작으므로 실제 충돌은 여전히 잡힌다. null로 두면 측정만 하고 예외를 던지지 않는다."
+    }
+  }
+}

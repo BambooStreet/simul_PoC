@@ -3,6 +3,8 @@ from pathlib import Path
 
 import mujoco
 
+from .config import load as load_config
+from .drive import add_actuators, urdf_efforts
 from .gripper import add_gripper
 from .layout import (
     BELT_END_X,
@@ -25,6 +27,7 @@ from .props import add_assets, add_pallet_visual, add_tote_visual
 
 ROOT = Path(__file__).resolve().parents[1]
 
+URDF_RELATIVE = ".deps/dexmate_urdf/robots/humanoid/vega_1/vega_1.urdf"
 # Drive wheel radius, so the chassis sits on the floor instead of floating.
 BASE_Z = 0.0548
 HALF_H = TOTE_HEIGHT / 2
@@ -70,10 +73,20 @@ def add_tote_walls(body, index):
             )
 
 
-def build(count=MAX_BOXES, nesting_pitch=NESTING_PITCH):
+def build(count=MAX_BOXES, nesting_pitch=NESTING_PITCH, mode="kinematic",
+          config=None):
+    """Compile the scene. `mode` decides timestep and whether actuators exist.
+
+    The two modes write different files so a dynamic run cannot leave a scene
+    behind that the kinematic tooling then reads as its own.
+    """
+    if config is None:
+        config = load_config("dynamics")
+    timestep = config[f"timestep.{mode}"]
     r = E.parse(ROOT / "assets/vega.xml").getroot()
     E.SubElement(
-        r, "option", timestep="0.005", integrator="implicitfast", gravity="0 0 -9.81"
+        r, "option", timestep=str(timestep), integrator="implicitfast",
+        gravity="0 0 -9.81",
     )
     visual = E.SubElement(r, "visual")
     E.SubElement(visual, "global", offwidth="1280", offheight="960")
@@ -81,7 +94,7 @@ def build(count=MAX_BOXES, nesting_pitch=NESTING_PITCH):
     w = r.find("worldbody")
     base = w.find("body[@name='base']")
     base.set("pos", f"0 0 {BASE_Z}")
-    # Differential drive turns the robot in place; the chassis never translates.
+    # Steered wheels turn the robot in place; the chassis never translates.
     E.SubElement(base, "joint", name="base_yaw", type="hinge", axis="0 0 1", pos="0 0 0")
     for g in base.iter("geom"):
         g.set("rgba", "0.7 0.74 0.8 1")
@@ -194,6 +207,9 @@ def build(count=MAX_BOXES, nesting_pitch=NESTING_PITCH):
                 solref=".01 1",
             )
 
-    path = ROOT / "assets/scene.xml"
+    if mode == "dynamic":
+        add_actuators(r, urdf_efforts(ROOT / URDF_RELATIVE))
+    path = ROOT / ("assets/scene.xml" if mode == "kinematic"
+                   else "assets/scene_dynamic.xml")
     E.ElementTree(r).write(path)
     return mujoco.MjModel.from_xml_path(str(path))

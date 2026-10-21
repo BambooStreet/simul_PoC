@@ -27,8 +27,10 @@ from .layout import (
     SLOTS,
     TOTE_HEIGHT,
 )
+from .config import load as load_config
+from .drive import DynamicDrive, KinematicDrive, urdf_efforts
 from .perception import RIM_OFFSET, OverheadCamera
-from .scene import ROOT, build
+from .scene import ROOT, URDF_RELATIVE, build
 
 # Carried-tote bottom clearance over the tallest existing column.
 STACK_CLEARANCE = 0.05
@@ -57,6 +59,8 @@ class Simulation:
         speed=2.0,
         seed=None,
         selection="random",
+        mode="kinematic",
+        config=None,
     ):
         if count < 1 or count > MAX_BOXES:
             raise ValueError(f"boxes must be in [1, {MAX_BOXES}]")
@@ -64,11 +68,17 @@ class Simulation:
             raise ValueError("nesting pitch must be in [0.015, 0.25] m")
         if not math.isfinite(speed) or not 0.1 <= speed <= 20:
             raise ValueError("viewer speed must be in [0.1, 20]")
+        if mode not in ["kinematic", "dynamic"]:
+            raise ValueError("mode must be kinematic or dynamic")
+        self.mode = mode
+        self.config = load_config("dynamics") if config is None else config
         self.playback_speed = speed
-        self.frame_steps = max(1, round(0.02 * speed / 0.005))
+        self.m = build(count, pitch, mode, self.config)
+        self.frame_steps = max(1, round(0.02 * speed / self.m.opt.timestep))
         self.wall_start = None
         self.sim_start = 0.0
-        self.m = build(count, pitch)
+        self.penetration_limit = self.config[f"contact.penetration_limit_{mode}"]
+        self.tote_contact_limit = self.config["contact.unheld_tote_contact_steps"]
         self.d = mujoco.MjData(self.m)
         self.ik = IK(self.m)
         self.seed = (
@@ -93,6 +103,9 @@ class Simulation:
         self.max_error = 0.0
         self.max_speed_ratio = 0.0
         self.max_drift = 0.0
+        self.tote_contact_steps = 0
+        self.worst_tote_contact = 0.0
+        self.tote_contact_totes = set()
         self.heights = [0] * 4
         self.qrobot = self.ik.rest.copy()
         self.nr = int(self.m.joint("tote_joint_0").qposadr[0])
@@ -120,9 +133,19 @@ class Simulation:
                     limit.get("velocity")
                 )
         self.vel_limits[self.base_q] = BASE_TURN_RATE
-        self.wheels = self.rolling_wheels()
+        self.steering, self.wheels = self.rolling_wheels()
+        # Rolling is slaved to base_yaw, which BASE_TURN_RATE already paces; pacing
+        # it again would let the small rear caster throttle the whole trajectory.
+        for adr, _ in self.wheels:
+            self.vel_limits[adr] = np.inf
+        # Start already steered, so the first waypoint is not a standing-still swerve.
+        for adr, angle in self.steering:
+            self.qrobot[adr] = angle
+        self.d.qpos[: self.nr] = self.qrobot[: self.nr]
+        mujoco.mj_forward(self.m, self.d)
         self.robot_bodies = set(range(1, int(self.m.body("tote_0").id)))
         self.tote_collision_masks = []
+        self.tote_bodies = {int(self.m.body(f"tote_{i}").id): i for i in range(count)}
         for i in range(count):
             body = self.m.body(f"tote_{i}").id
             geoms = np.flatnonzero(self.m.geom_bodyid == body)
@@ -149,25 +172,82 @@ class Simulation:
             self.viewer.cam.elevation = -22
         self.validate_contacts()
         self.base_initial = self.d.body("base").xpos.copy()
+        if mode == "kinematic":
+            self.drive = KinematicDrive(self)
+        else:
+            self.drive = DynamicDrive(
+                self, self.config, urdf_efforts(ROOT / URDF_RELATIVE)
+            )
+            if self.penetration_limit is None:
+                self.log("CONTACT_LIMIT_UNSET",
+                         note="dynamic penetration is measured, not enforced")
+        for entry in self.config.unevidenced():
+            self.log("CONFIG_UNEVIDENCED", path=entry["path"],
+                     value=entry["value"], source=entry["source"])
 
     def rolling_wheels(self):
-        """Wheel angle per radian of base yaw that keeps the contact point still."""
+        """Steer each wheel onto the turn tangent, then roll it without side slip.
+
+        Vega-1 steers: every wheel carries a yaw joint (`*_wheel_j1`) under the
+        rolling joint (`*_wheel_j2`). Leaving the yaw at zero drags the tyres
+        sideways, because the base pivots 185 mm behind the drive axle rather than
+        on it. Turning in place keeps each contact point on a fixed circle about
+        the base origin, so in the base frame the tangent direction never moves:
+        the steer angle is a constant and only the rolling angle tracks the
+        heading. The rear caster trails 34 mm behind its own steer axis, so
+        steering swings its contact point; solving iteratively lets that settle.
+        """
         jac = np.zeros((3, self.m.nv))
-        rolling = []
-        for name in ["L_wheel_j2", "R_wheel_j2"]:
-            joint = self.m.joint(name)
+        steering, rolling, slip = [], [], 0.0
+        for steer, roll in [
+            ("L_wheel_j1", "L_wheel_j2"),
+            ("R_wheel_j1", "R_wheel_j2"),
+            ("B_wheel_j1", "B_wheel_j2"),
+        ]:
+            pivot = self.m.joint(steer)
+            adr = int(pivot.qposadr[0])
+            joint = self.m.joint(roll)
             body = int(self.m.jnt_bodyid[joint.id])
             geom = int(np.flatnonzero(self.m.geom_bodyid == body)[0])
-            # The chassis stands on its wheels, so the axle height is the radius.
-            centre = self.d.geom_xpos[geom].copy()
-            ground = centre * [1, 1, 0]
-            mujoco.mj_jac(self.m, self.d, jac, None, ground, body)
-            spin = jac[:, int(joint.dofadr[0])]
-            drift = np.cross([0, 0, 1.0], ground - self.d.body("base").xpos)
-            rolling.append(
-                (int(joint.qposadr[0]), -float(spin @ drift) / float(spin @ spin))
-            )
-        return rolling
+            dof = int(joint.dofadr[0])
+            angle = 0.0
+            for _ in range(60):
+                self.d.qpos[adr] = angle
+                mujoco.mj_forward(self.m, self.d)
+                # The chassis stands on its wheels, so the axle height is the radius.
+                ground = self.d.geom_xpos[geom] * [1, 1, 0]
+                mujoco.mj_jac(self.m, self.d, jac, None, ground, body)
+                spin = jac[:, dof]
+                drift = np.cross([0, 0, 1.0], ground - self.d.body("base").xpos)
+                # Rolling runs either way, so align the wheel plane modulo pi and
+                # let the rolling ratio pick up the sign.
+                error = math.atan2(drift[1], drift[0]) - math.atan2(spin[1], spin[0])
+                error = (error + math.pi / 2) % math.pi - math.pi / 2
+                angle -= error
+                if abs(error) < 1e-12:
+                    break
+            else:
+                raise RuntimeError(f"Steering for {steer} did not converge")
+            limit = self.m.jnt_range[pivot.id]
+            if self.m.jnt_limited[pivot.id] and not limit[0] <= angle <= limit[1]:
+                raise RuntimeError(
+                    f"Steering {steer}={angle:.4f} rad outside {np.round(limit, 4)}"
+                )
+            ratio = -float(spin @ drift) / float(spin @ spin)
+            # Whatever the rolling cannot cancel across the wheel plane is scrub.
+            # Only the horizontal part is slip: the generated meshes leave each axle
+            # a few microradians off level, so the residual keeps a vertical term of
+            # about a micrometre per radian that no steering can remove.
+            heading = spin * [1, 1, 0]
+            heading /= np.linalg.norm(heading)
+            residual = drift + ratio * spin
+            slip = max(slip, abs(float(residual @ np.cross([0, 0, 1.0], heading))))
+            steering.append((adr, float(angle)))
+            rolling.append((int(joint.qposadr[0]), ratio))
+        if slip > 1e-9:
+            raise RuntimeError(f"Wheel side slip {slip:.3e} m per rad of yaw")
+        self.wheel_slip = slip * BASE_TURN_RATE
+        return steering, rolling
 
     def hand_target(self, base_point, yaw=None):
         """Base-frame hand centre expressed in world coordinates."""
@@ -201,8 +281,66 @@ class Simulation:
         self.events.append(item)
         print(json.dumps(item), flush=True)
 
+    def unexpected_tote_contacts(self):
+        """Robot touching a tote it is neither carrying nor reaching into.
+
+        `ik.ignore_bodies` already tracks the totes the hooks are allowed to
+        touch: the one being picked, which `engage()` requires prong contact
+        with, and the one just released, whose hand holes the hooks are still
+        withdrawing from. Anything else is the arm hitting the stack.
+
+        Counts force-producing contacts only, so a hook detecting a ledge a few
+        millimetres away does not read as a collision.
+        """
+        hits = []
+        for index in range(self.d.ncon):
+            contact = self.d.contact[index]
+            # MuJoCo's own inclusion test. The hooks carry a 4 mm margin so
+            # `engage()` can seat on a ledge without pressing into it, and the
+            # solver really does include those contacts, so a hook within 4 mm
+            # of a tote counts as touching it.
+            if contact.dist >= contact.includemargin:
+                continue
+            bodies = [
+                int(self.m.geom_bodyid[g]) for g in (contact.geom1, contact.geom2)
+            ]
+            if not any(b in self.robot_bodies for b in bodies):
+                continue
+            for body in bodies:
+                if body in self.tote_bodies and body not in self.ik.ignore_bodies:
+                    hits.append((int(index), self.tote_bodies[body],
+                                 float(contact.dist)))
+        return hits
+
+    def validate_tote_contacts(self):
+        """Dynamic-mode collision verdict: contact, not penetration depth.
+
+        Depth depends on solver parameters; what the step actually needs to know
+        is whether the arm touched a tote it had no business touching.
+        """
+        hits = self.unexpected_tote_contacts()
+        if not hits:
+            return
+        self.tote_contact_steps += 1
+        worst = min(hit[2] for hit in hits)
+        self.worst_tote_contact = min(self.worst_tote_contact, worst)
+        for _, tote, _ in hits:
+            self.tote_contact_totes.add(tote)
+        if self.tote_contact_limit is None:
+            return
+        if self.tote_contact_steps > self.tote_contact_limit:
+            names = sorted({f"tote_{t}" for _, t, _ in hits})
+            raise RuntimeError(
+                f"Robot hit {', '.join(names)} it is not holding for "
+                f"{self.tote_contact_steps} steps, worst gap {worst:.4f} m"
+            )
+
     def validate_contacts(self):
-        for index in np.flatnonzero(self.d.contact.dist < -0.003):
+        if self.mode == "dynamic":
+            self.validate_tote_contacts()
+        if self.penetration_limit is None:
+            return
+        for index in np.flatnonzero(self.d.contact.dist < -self.penetration_limit):
             c = self.d.contact[int(index)]
             b1 = int(self.m.geom_bodyid[c.geom1])
             b2 = int(self.m.geom_bodyid[c.geom2])
@@ -216,10 +354,10 @@ class Simulation:
                 )
 
     def validate_payload(self):
-        if self.attached is None:
+        if self.attached is None or self.penetration_limit is None:
             return
         bid = self.m.body(f"tote_{self.attached}").id
-        for index in np.flatnonzero(self.d.contact.dist < -0.003):
+        for index in np.flatnonzero(self.d.contact.dist < -self.penetration_limit):
             c = self.d.contact[int(index)]
             bodies = [int(self.m.geom_bodyid[g]) for g in [c.geom1, c.geom2]]
             if (
@@ -228,21 +366,17 @@ class Simulation:
             ):
                 raise RuntimeError(f"Carried tote penetrates obstacle: {c.dist:.4f} m")
 
-    def step(self, q):
-        # Ideal position tracking, explicitly NOT a torque-controlled or balancing model.
+    def step(self, q, v=None):
         if self.viewer and self.wall_start is None:
             self.wall_start = time.perf_counter()
             self.sim_start = self.d.time
-        old = self.d.qpos[: self.nr].copy()
-        self.d.qpos[: self.nr] = q[: self.nr]
-        self.d.qvel[: self.nvrobot] = (q[: self.nr] - old) / self.m.opt.timestep
+        self.drive.command(q, v)
         self.update_feed()
         mujoco.mj_forward(self.m, self.d)
         self.validate_contacts()
         self.validate_payload()
         mujoco.mj_step(self.m, self.d)
-        self.d.qpos[: self.nr] = q[: self.nr]
-        self.d.qvel[: self.nvrobot] = 0
+        self.drive.settle(q)
         mujoco.mj_forward(self.m, self.d)
         if not np.all(np.isfinite(self.d.qpos)):
             raise RuntimeError("Nonfinite state")
@@ -259,8 +393,9 @@ class Simulation:
                 time.sleep(remaining)
 
     def hold(self, seconds):
+        still = np.zeros(self.m.nv)
         for _ in range(math.ceil(seconds / self.m.opt.timestep)):
-            self.step(self.qrobot)
+            self.step(self.qrobot, still)
 
     def reach(self, base_point, yaw=None):
         """Solve one waypoint at the current hook span; pose is in base coordinates."""
@@ -274,6 +409,8 @@ class Simulation:
                 f"span={self.span:.3f}, error={err:.4f}"
             )
         target[self.base_q] = base_yaw
+        for adr, angle in self.steering:
+            target[adr] = angle
         for adr, gain in self.wheels:
             target[adr] = gain * base_yaw
         return target, center
@@ -316,8 +453,13 @@ class Simulation:
             self.max_speed_ratio,
             float(np.max(delta / (steps * self.m.opt.timestep) / self.vel_limits)),
         )
+        # Constant over the ramp, and in dof order: every robot joint is a hinge.
+        rate = np.zeros(self.m.nv)
+        rate[: self.nvrobot] = (
+            target[: self.nr] - old[: self.nr]
+        ) / (steps * self.m.opt.timestep)
         for a in np.linspace(0, 1, steps + 1)[1:]:
-            self.step(old + (target - old) * a)
+            self.step(old + (target - old) * a, rate)
         self.qrobot = target.copy()
 
     def start_feed(self, i):
@@ -517,6 +659,15 @@ class Simulation:
             "max_ik_component_error": self.max_error,
             "max_joint_speed_ratio": self.max_speed_ratio,
             "max_stack_drift_m": self.max_drift,
+            "max_wheel_slip_m_s": self.wheel_slip,
+            "unheld_tote_contact_steps": self.tote_contact_steps,
+            "unheld_tote_contact_worst_gap_m": self.worst_tote_contact,
+            "unheld_tote_contact_totes": sorted(self.tote_contact_totes),
+            "drive": self.mode,
+            "timestep_s": float(self.m.opt.timestep),
+            "penetration_limit_m": self.penetration_limit,
+            "unevidenced_config": self.config.unevidenced(),
+            **self.drive.metrics(),
             "qpos": self.d.qpos.tolist(),
             "base_displacement_m": float(
                 np.linalg.norm(self.d.body("base").xpos - self.base_initial)
@@ -528,7 +679,7 @@ class Simulation:
             "positions": [
                 self.d.body(f"tote_{i}").xpos.tolist() for i in range(self.count)
             ],
-            "mode": "turning base; dual hand-hole hooks; RGB-D semantic camera; "
-                    "kinematic robot",
+            "mode": "turning base on steered wheels; dual hand-hole hooks; "
+                    f"RGB-D semantic camera; {self.mode} robot",
             "events": self.events,
         }

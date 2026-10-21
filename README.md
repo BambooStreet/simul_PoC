@@ -22,13 +22,38 @@ MUJOCO_GL=egl OPENBLAS_NUM_THREADS=1 python run.py --boxes 32 --seed 2 --image r
 MUJOCO_GL=egl OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -v
 ```
 
+모델 자체의 점검은 `python scripts/step1_check.py`(`--write`로 `reports/step1_model_check.md`
+갱신), 선회 중 바퀴 횡슬립 측정은 `python scripts/verify_steering.py`,
+동역학 통과 기준 9개는 `python scripts/verify_dynamics.py`입니다.
+
+## 구동 모드
+
+`--mode kinematic`(기본)은 궤적을 상태에 직접 기록하는 이상적 위치 재생이며,
+`reports/baseline_kinematic/`의 동결 결과가 이 모드로 기록됐습니다. 토트는 두 모드에서
+모두 실제 물리입니다.
+
+`--mode dynamic`은 몸통 3 + 양팔 14 = **17개 관절을 토크 액추에이터로 구동**합니다
+(`forcerange` = URDF effort). 제어기는 역동역학 피드포워드 + 적재물 보상 + PD이고,
+게인은 운반 자세에서 측정한 관절 관성에 비례합니다. 베이스 선회·머리·바퀴는 2단계에서
+아직 이상화된 위치 구속이며 4단계에서 실제 모터로 바뀝니다. timestep은 2 ms입니다.
+
+근거 없는 값(ωn, armature β 등)은 `config/dynamics.json`에 `source: estimated`로
+들어가고 실행 시작 시 목록으로 출력됩니다. 측정 결과와 남은 한계는
+`docs/dynamics_step2_design.md` 9절에 있습니다.
+
 - `--seed 2`: 임의 적재 순서 재현. 생략하면 실행마다 새 seed를 생성하고 보고서에 기록합니다.
 - `--selection ordered`: 같은 높이의 후보 중 슬롯 번호순 선택. 기본은 `random`입니다.
 - `--nesting-pitch 0.058`: 토트 하나를 포갤 때 증가 높이(m). 사용자 현장 수치입니다.
 - `--boxes 32`: 이번 팔레트에서 처리할 개수. 기본 32는 구역당 8층이며 최대값입니다.
 - `--report reports/latest.json`: 이벤트와 검증 결과 저장 경로.
 
-처음 설치할 때 `bash scripts/setup.sh`를 실행합니다. 공식 로봇 패키지는 프로젝트 `.deps`에 설치합니다. `.deps`에 런타임 의존성도 설치했다면 `PYTHONPATH="$PWD/.deps" python run.py --viewer`로 실행합니다. 프로젝트를 옮기면 준비 스크립트를 다시 실행하세요. 현재 Python은 `/home/ohmyhong1/miniforge3/envs/robot/bin/python`, MuJoCo는 3.13.0입니다.
+처음 설치할 때 `bash scripts/setup.sh`로 공식 로봇 패키지를 프로젝트 `.deps`에 설치하고, 이어서
+`python scripts/prepare_robot.py`로 모델을 생성합니다. 저장소는 생성물(`assets/vega.xml`,
+`assets/vega_collision.urdf`, `assets/scene.xml`, `assets/collision/`)을 추적하지 않으므로 이 단계를
+건너뛰면 모델이 없습니다. 생성 결과는 `python scripts/step1_check.py`로 검증할 수 있습니다.
+`.deps`에 런타임 의존성도 설치했다면 `PYTHONPATH="$PWD/.deps" python run.py --viewer`로 실행합니다.
+프로젝트를 옮기면 준비 스크립트를 다시 실행하세요. 현재 Python은
+`/home/ohmyhong1/miniforge3/envs/robot/bin/python`, MuJoCo는 3.13.0입니다.
 
 ## 현장 수치
 
@@ -51,7 +76,10 @@ MUJOCO_GL=egl OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -v
 컨베이어에서 토트를 집은 뒤 별도의 수평 이동 없이 선회만으로 팔레트 쪽으로 옮깁니다.
 선회 중 운반 토트의 궤적 반경(0.684 m)이 가장 가까운 적재 열의 안쪽 끝(0.733 m)보다
 작도록 운반 자세를 잡았습니다. 공식 모델에 허리 회전 관절이 없으므로 뒤돌기는 원래
-있는 차동 구동 베이스의 Z축 회전으로 구현했고, 구동 바퀴도 미끄러짐 없이 함께 굴립니다.
+있는 베이스의 Z축 회전으로 구현했습니다. 베이스는 차동 구동이 아니라 **조향 구동**이어서
+바퀴마다 조향 관절(`*_wheel_j1`)이 굴림 관절(`*_wheel_j2`) 위에 있습니다. 선회 중심이 구동축
+중점보다 185 mm 뒤에 있으므로, 세 바퀴를 각자의 선회 접선으로 조향한 뒤 굴림각을 다시 계산해
+접지점 횡슬립을 없앴습니다(최대 5.1e-7 m/s, 조향 고정 시 0.14 m/s).
 
 **층수는 8층입니다.** 중첩 pitch가 58 mm로 확정되면서, 9층째를 쌓으려면 먼 열(x=1.37) 위를
 토트를 든 채 1.015 m 높이로 지나가야 하는데 이 자세의 도달 한계가 0.991 m입니다.

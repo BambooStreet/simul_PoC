@@ -23,7 +23,9 @@ from poc_sim.layout import (
     SLOTS,
     TOTE_HEIGHT,
 )
+from poc_sim.drive import IDEALISED_JOINTS, TORQUE_JOINTS, urdf_efforts
 from poc_sim.props import HOOK_NOSE_X, HOOK_PRONG_X, RIM_HALF_Y
+from poc_sim.scene import ROOT, URDF_RELATIVE, build
 from poc_sim.simulation import STACK_CLEARANCE, Simulation
 
 REST_Z = PALLET_TOP + TOTE_HEIGHT / 2
@@ -130,6 +132,70 @@ class BaselineChecks(unittest.TestCase):
         self.assertAlmostEqual(a[2], REST_Z, delta=0.003)
         self.assertAlmostEqual(b[2] - a[2], s.pitch, delta=0.003)
         self.assertLess(np.linalg.norm(b[:2] - [sx, sy]), 0.003)
+
+
+class DynamicDriveChecks(unittest.TestCase):
+    """Step 2: the torque-controlled modes's structure and standing accuracy."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sim = Simulation(1, mode="dynamic")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.sim.close()
+
+    def test_every_robot_joint_is_driven(self):
+        """An unactuated joint would fall under gravity instead of holding."""
+        s = self.sim
+        driven = {s.m.actuator(i).trnid[0] for i in range(s.m.nu)}
+        robot = {
+            j for j in range(s.m.njnt)
+            if s.m.jnt_bodyid[j] < s.m.body("tote_0").id
+        }
+        self.assertEqual(robot, driven)
+        self.assertEqual(s.m.nu, len(TORQUE_JOINTS) + len(IDEALISED_JOINTS))
+
+    def test_torque_limits_come_from_the_urdf(self):
+        s = self.sim
+        efforts = urdf_efforts(ROOT / URDF_RELATIVE)
+        for name in TORQUE_JOINTS:
+            actuator = s.m.actuator(f"tau_{name}")
+            lower, upper = s.m.actuator_forcerange[actuator.id]
+            self.assertAlmostEqual(upper, efforts[name], places=6)
+            self.assertAlmostEqual(lower, -efforts[name], places=6)
+
+    def test_wrist_gains_account_for_the_payload(self):
+        """Sizing on bare link inertia leaves the wrist 20x too soft for a tote."""
+        s = self.sim
+        # A freshly compiled model has no armature injected, so its mass matrix
+        # is the bare link inertia the design sketch sized gains on.
+        bare = np.zeros((s.m.nv, s.m.nv))
+        bare_model = build(1, s.pitch, "dynamic", s.config)
+        bare_data = mujoco.MjData(bare_model)
+        bare_data.qpos[:] = s.d.qpos
+        mujoco.mj_forward(bare_model, bare_data)
+        mujoco.mj_fullM(bare_model, bare_data, bare)
+        sized = {j["name"]: j["inertia_kg_m2"] for j in s.drive.metrics()["joints"]}
+        for name in ["L_arm_j5", "R_arm_j5"]:
+            dof = int(s.m.joint(name).dofadr[0])
+            self.assertGreater(sized[name], 10 * bare[dof, dof])
+
+    def test_holding_still_does_not_sag(self):
+        s = self.sim
+        site = s.m.site("L_grip").id
+        before = float(s.d.site_xpos[site][2])
+        s.hold(1.0)
+        self.assertLess(abs(before - float(s.d.site_xpos[site][2])), 0.002)
+
+    def test_kinematic_mode_has_no_actuators(self):
+        """The frozen baseline was recorded with none; adding any would change it."""
+        plain = Simulation(1)
+        try:
+            self.assertEqual(plain.m.nu, 0)
+            self.assertEqual(plain.m.opt.timestep, 0.005)
+        finally:
+            plain.close()
 
 
 class StationChecks(unittest.TestCase):

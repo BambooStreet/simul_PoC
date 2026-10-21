@@ -22,6 +22,8 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from poc_sim.layout import BASE_TURN_RATE  # noqa: E402
+
 
 URDF = ROOT / ".deps/dexmate_urdf/robots/humanoid/vega_1/vega_1.urdf"
 SRDF = ROOT / ".deps/dexmate_urdf/robots/humanoid/vega_1/vega_1.srdf"
@@ -885,6 +887,45 @@ def render(m, d, robot_bodies, outdir):
     return shots, shown
 
 
+def steering_state():
+    """What the simulation actually prescribes for the wheels, and the slip left.
+
+    Measured through Simulation itself rather than re-derived, so the report
+    tracks the code instead of a transcription of it.
+    """
+    from poc_sim.simulation import Simulation
+
+    sim = Simulation(1)
+    jac = np.zeros((3, sim.m.nv))
+    rows = []
+    for (adr, angle), (roll_adr, gain) in zip(sim.steering, sim.wheels):
+        joint = sim.m.joint(int(np.flatnonzero(sim.m.jnt_qposadr == roll_adr)[0]))
+        tag = joint.name.split("_")[0]
+        body = int(sim.m.jnt_bodyid[joint.id])
+        geom = int(np.flatnonzero(sim.m.geom_bodyid == body)[0])
+
+        def residual(steer_angle):
+            sim.d.qpos[adr] = steer_angle
+            mujoco.mj_forward(sim.m, sim.d)
+            ground = sim.d.geom_xpos[geom] * [1, 1, 0]
+            mujoco.mj_jac(sim.m, sim.d, jac, None, ground, body)
+            spin = jac[:, int(joint.dofadr[0])]
+            drift = np.cross([0, 0, 1.0], ground - sim.d.body("base").xpos)
+            ratio = -float(spin @ drift) / float(spin @ spin)
+            heading = spin * [1, 1, 0]
+            heading /= np.linalg.norm(heading)
+            across = np.cross([0, 0, 1.0], heading)
+            lever = float(np.linalg.norm((ground - sim.d.body("base").xpos)[:2]))
+            return abs(float((drift + ratio * spin) @ across)), lever
+
+        # The shipped behaviour pinned every steer joint at zero.
+        before, _ = residual(0.0)
+        after, lever = residual(angle)
+        rows.append((tag, angle, gain, lever,
+                     before * BASE_TURN_RATE, after * BASE_TURN_RATE))
+    return {"rows": rows, "slip": max(r[5] for r in rows)}
+
+
 def section5(m, d, uj, usens, shots, nshown):
     w("### 충돌 형상 렌더링")
     w()
@@ -1201,15 +1242,41 @@ def priorities(m, robot_bodies):
       "이 모델에서 나올 수 없다**는 점을 결과물에 못박아야 합니다.")
     w()
 
-    w("### P1 — 조향 조인트 미사용")
-    w()
-    w("`L/R_wheel_j1`(z축 조향, ±2.722 rad, effort 6 N·m)이 전 구동 동안 0에 "
-      "고정됩니다. `poc_sim/simulation.py:153-170`의 `rolling_wheels()`는 "
-      "`*_wheel_j2`(롤링)만 회전시킵니다. 제자리 선회 시 접지점이 요구하는 이동의 "
-      "일부를 롤링으로 만들 수 없어 측면 미끄러짐이 남습니다. "
-      "운동학 모델이라 벌점이 없을 뿐, README 54행의 "
-      "'구동 바퀴도 미끄러짐 없이 함께 굴립니다'는 성립하지 않습니다.")
-    w()
+    steer = steering_state()
+    if steer["slip"] > 1e-9:
+        w("### P1 — 조향 조인트 미사용")
+        w()
+        w("`L/R_wheel_j1`(z축 조향, ±2.722 rad, effort 6 N·m)이 전 구동 동안 0에 "
+          "고정됩니다. `rolling_wheels()`가 `*_wheel_j2`(롤링)만 회전시킵니다. "
+          "제자리 선회 시 접지점이 요구하는 이동의 일부를 롤링으로 만들 수 없어 "
+          f"측면 미끄러짐이 남습니다 — 선회율 {BASE_TURN_RATE} rad/s에서 "
+          f"최대 {steer['slip']:.3e} m/s. 운동학 모델이라 벌점이 없을 뿐, "
+          "README의 '구동 바퀴도 미끄러짐 없이 함께 굴립니다'는 성립하지 않습니다.")
+        w()
+    else:
+        w("### P1 — 조향 조인트 미사용 — **해결됨**")
+        w()
+        w("`rolling_wheels()`가 세 바퀴 모두 선회 접선으로 조향한 뒤 굴림비를 "
+          "재계산합니다. 제자리 선회는 접지점을 베이스 원점 기준 고정 원 위에 두므로 "
+          "**베이스 좌표계에서 접선 방향이 변하지 않습니다** — 조향각은 상수이고 "
+          "굴림각만 heading에 비례합니다. 후방 캐스터는 조향축보다 34 mm 뒤에 "
+          "접지하므로 조향이 접지점을 움직여서, 반복 해법으로 수렴시킵니다.")
+        w()
+        table(["바퀴", "조향각", "굴림비 (rad/rad)", "레버암", "조향 전 횡슬립",
+               "조향 후"],
+              [[f"`{tag}_wheel`", f"{a:+.4f} rad ({np.degrees(a):+.2f}°)",
+                f"{g:+.4f}", f"{lever:.4f} m", f"{before:.3e} m/s",
+                f"**{after:.1e} m/s**"]
+               for tag, a, g, lever, before, after in steer["rows"]])
+        w(f"선회율 {BASE_TURN_RATE} rad/s 기준입니다. `L/R_wheel_j1`의 조향각은 "
+          "한계 ±2.722 rad 안에 들어오고 `B_wheel_j1`은 continuous라 한계가 "
+          "없습니다. 위 수치는 운반 자세에서의 해석적 잔차이고, 실제 180° 선회를 "
+          "돌려 접지점 속도를 유한차분으로 읽으면 수치 잡음이 섞여 5e-7 m/s "
+          "수준으로 측정됩니다 — `scripts/verify_steering.py`.")
+        w()
+        w("후방 캐스터 `B_wheel_j1`/`B_wheel_j2`는 수정 전에는 구동 목록에 "
+          "아예 없었습니다. 레버암이 0.299 m로 가장 길어 횡슬립도 가장 컸습니다.")
+        w()
 
     w("### P2 — 헤드 ZED 카메라 미정의")
     w()

@@ -7,3 +7,4 @@ assets/scene.xml
 reports/*.png
 .ruff_cache/
 assets/collision/
+assets/scene_dynamic.xml

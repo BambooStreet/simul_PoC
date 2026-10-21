@@ -1,0 +1,552 @@
+{
+  "boxes": 8,
+  "results": [
+    {
+      "name": "static sag",
+      "measured": "0.252 mm",
+      "limit": "2 mm",
+      "verdict": "PASS",
+      "note": "residual is the dual-weld loop's geometric offset, not droop"
+    },
+    {
+      "name": "tracking while carrying a tote",
+      "measured": "max 20.34 mm, rms 3.85 mm",
+      "limit": "",
+      "verdict": "INFO",
+      "note": "67704 steps, joints max 59.9 mrad \u2014 this is what step 2 is judged on"
+    },
+    {
+      "name": "tracking while empty",
+      "measured": "max 40.54 mm, rms 5.48 mm",
+      "limit": "",
+      "verdict": "INFO",
+      "note": "105794 steps, peak at t=236.3 s (hook insertion)"
+    },
+    {
+      "name": "joint tracking, whole cycle",
+      "measured": "max 60.16 mrad, rms 3.46 mrad",
+      "limit": "",
+      "verdict": "INFO",
+      "note": "idealised joints max 27.15 mrad"
+    },
+    {
+      "name": "torque saturation",
+      "measured": "0.0000% of steps",
+      "limit": "0% at rest",
+      "verdict": "PASS",
+      "note": "worst use torso_j2 73.5%"
+    },
+    {
+      "name": "mode agreement",
+      "measured": "counts [2, 2, 2, 2] vs [2, 2, 2, 2]",
+      "limit": "exact match",
+      "verdict": "PASS",
+      "note": "slot and level per tote identical"
+    },
+    {
+      "name": "kinematic regression",
+      "measured": "cycle 355.380 s, drift 3.91 mm",
+      "limit": "0.1 s / 1 mm",
+      "verdict": "INFO",
+      "note": "the 32-tote comparison in reports/baseline_kinematic is the real check; dynamic runs 8.384 s longer here"
+    },
+    {
+      "name": "contact with an unheld tote",
+      "measured": "0 steps",
+      "limit": "0 steps",
+      "verdict": "PASS",
+      "note": "none, so the threshold can be 0"
+    },
+    {
+      "name": "armature = 0.1 flat",
+      "measured": "aborted: Robot hit tote_0 it is not holding for 1 steps, worst gap 0.0034 m",
+      "limit": "saturation conclusion unchanged",
+      "verdict": "FAIL",
+      "note": ""
+    }
+  ],
+  "dynamic": {
+    "boxes": 8,
+    "counts": [
+      2,
+      2,
+      2,
+      2
+    ],
+    "pitch_m": 0.058,
+    "simulation_seconds": 346.99600000092875,
+    "max_ik_component_error": 0.00028507038943947904,
+    "max_joint_speed_ratio": 0.868899395284275,
+    "max_stack_drift_m": 0.0027385217884122637,
+    "max_wheel_slip_m_s": 1.0651787401722232e-14,
+    "unheld_tote_contact_steps": 0,
+    "unheld_tote_contact_worst_gap_m": 0.0,
+    "unheld_tote_contact_totes": [],
+    "drive": "dynamic",
+    "timestep_s": 0.002,
+    "penetration_limit_m": 0.009,
+    "unevidenced_config": [
+      {
+        "path": "control.armature_beta",
+        "value": 0.05,
+        "unit": "-",
+        "source": "estimated",
+        "note": "\ubc18\uc0ac \ub85c\ud130 \uad00\uc131 / \ub9c1\ud06c \uad00\uc131 \ube44. \uac10\uc18d\uae30 \uc0ac\uc591 \ubbf8\ud655\ubcf4. beta in {0.025,0.05,0.10} \ubbfc\uac10\ub3c4 \uc2dc\ud5d8\uc73c\ub85c \ubc29\uc5b4."
+      },
+      {
+        "path": "control.omega_n",
+        "value": 20.0,
+        "unit": "rad/s",
+        "source": "estimated",
+        "note": "\ubaa9\ud45c \ud3d0\ub8e8\ud504 \uace0\uc720\uc9c4\ub3d9\uc218 3.2 Hz. \uc9c0\ub839 \uada4\uc801 \ub300\uc5ed\ud3ed\uc774 1 Hz \ubbf8\ub9cc\uc774\ub77c 3\ubc30 \uc5ec\uc720. \uc2e4\uc81c \uc81c\uc5b4\uae30 \ub300\uc5ed\ud3ed \uc790\ub8cc \uc5c6\uc74c."
+      },
+      {
+        "path": "idealised.omega_n",
+        "value": 200.0,
+        "unit": "rad/s",
+        "source": "idealised",
+        "note": "base_yaw/head/wheel\uc744 \uad6c\uc18d\uc73c\ub85c \uc720\uc9c0\ud558\ub294 position \uc561\ucd94\uc5d0\uc774\ud130 \ub300\uc5ed\ud3ed. forcerange \uc5c6\uc74c. 4\ub2e8\uacc4\uc5d0\uc11c \uc2e4\uc81c \uad6c\ub3d9/\uc870\ud5a5 \ubaa8\ud130\ub85c \uad50\uccb4."
+      }
+    ],
+    "max_joint_tracking_error_rad": 0.06016108231657502,
+    "rms_joint_tracking_error_rad": 0.003462388668945863,
+    "max_hand_tracking_error_m": 0.040537083221001566,
+    "rms_hand_tracking_error_m": 0.0049073661904307595,
+    "max_idealised_tracking_error_rad": 0.027151310852311233,
+    "max_hand_tracking_error_time_s": 236.30800000040023,
+    "carrying": {
+      "steps": 67704,
+      "max_hand_tracking_error_m": 0.020341854183922578,
+      "rms_hand_tracking_error_m": 0.0038450231228470675,
+      "max_joint_tracking_error_rad": 0.059886181202056465
+    },
+    "empty": {
+      "steps": 105794,
+      "max_hand_tracking_error_m": 0.040537083221001566,
+      "rms_hand_tracking_error_m": 0.005480202823231531,
+      "max_joint_tracking_error_rad": 0.06016108231657502
+    },
+    "max_contact_penetration_m": 0.002838355276753041,
+    "torque_saturation_fraction": 0.0,
+    "joints": [
+      {
+        "name": "torso_j1",
+        "inertia_kg_m2": 31.21579901836579,
+        "kp": 12486.319607346315,
+        "kv": 1248.6319607346315,
+        "armature": 1.5607899509182896,
+        "effort_limit_nm": 700.0,
+        "max_torque_nm": 460.0478928182806,
+        "torque_use": 0.6572112754546866,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.007856041677870185
+      },
+      {
+        "name": "torso_j2",
+        "inertia_kg_m2": 11.816942614400396,
+        "kp": 4726.777045760158,
+        "kv": 472.67770457601586,
+        "armature": 0.5908471307200198,
+        "effort_limit_nm": 380.0,
+        "max_torque_nm": 279.16684201879485,
+        "torque_use": 0.7346495842599865,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.02836898261644505
+      },
+      {
+        "name": "torso_j3",
+        "inertia_kg_m2": 7.032677100577893,
+        "kp": 2813.0708402311575,
+        "kv": 281.30708402311575,
+        "armature": 0.35163385502889466,
+        "effort_limit_nm": 380.0,
+        "max_torque_nm": 144.9112980653087,
+        "torque_use": 0.38134552122449655,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.017510965748873897
+      },
+      {
+        "name": "L_arm_j1",
+        "inertia_kg_m2": 2.0090772252618705,
+        "kp": 803.6308901047482,
+        "kv": 80.36308901047482,
+        "armature": 0.10045386126309352,
+        "effort_limit_nm": 150.0,
+        "max_torque_nm": 40.114506372995436,
+        "torque_use": 0.26743004248663627,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.06003033957903614
+      },
+      {
+        "name": "L_arm_j2",
+        "inertia_kg_m2": 1.5690623083882578,
+        "kp": 627.624923355303,
+        "kv": 62.76249233553031,
+        "armature": 0.0784531154194129,
+        "effort_limit_nm": 150.0,
+        "max_torque_nm": 19.21300903004557,
+        "torque_use": 0.12808672686697045,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.02347046942019307
+      },
+      {
+        "name": "L_arm_j3",
+        "inertia_kg_m2": 0.5105234980152764,
+        "kp": 204.20939920611056,
+        "kv": 20.420939920611055,
+        "armature": 0.025526174900763823,
+        "effort_limit_nm": 80.0,
+        "max_torque_nm": 12.448216777653847,
+        "torque_use": 0.15560270972067308,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.04213528845498171
+      },
+      {
+        "name": "L_arm_j4",
+        "inertia_kg_m2": 0.5680961392707482,
+        "kp": 227.23845570829928,
+        "kv": 22.72384557082993,
+        "armature": 0.02840480696353741,
+        "effort_limit_nm": 80.0,
+        "max_torque_nm": 17.539576125303245,
+        "torque_use": 0.21924470156629056,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.034080160815446625
+      },
+      {
+        "name": "L_arm_j5",
+        "inertia_kg_m2": 0.30179691440987283,
+        "kp": 120.71876576394914,
+        "kv": 12.071876576394914,
+        "armature": 0.015089845720493641,
+        "effort_limit_nm": 25.0,
+        "max_torque_nm": 5.566231614275824,
+        "torque_use": 0.22264926457103296,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.03692700144445363
+      },
+      {
+        "name": "L_arm_j6",
+        "inertia_kg_m2": 0.16884174811355857,
+        "kp": 67.53669924542342,
+        "kv": 6.753669924542343,
+        "armature": 0.008442087405677928,
+        "effort_limit_nm": 25.0,
+        "max_torque_nm": 5.9533928870080635,
+        "torque_use": 0.23813571548032253,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.02278782584489414
+      },
+      {
+        "name": "L_arm_j7",
+        "inertia_kg_m2": 0.20311454857738348,
+        "kp": 81.24581943095339,
+        "kv": 8.12458194309534,
+        "armature": 0.010155727428869174,
+        "effort_limit_nm": 25.0,
+        "max_torque_nm": 2.053848039590382,
+        "torque_use": 0.08215392158361529,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.023316947260339282
+      },
+      {
+        "name": "R_arm_j1",
+        "inertia_kg_m2": 2.0057224157614932,
+        "kp": 802.2889663045974,
+        "kv": 80.22889663045973,
+        "armature": 0.10028612078807467,
+        "effort_limit_nm": 150.0,
+        "max_torque_nm": 42.54791308009232,
+        "torque_use": 0.28365275386728217,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.06016108231657502
+      },
+      {
+        "name": "R_arm_j2",
+        "inertia_kg_m2": 1.564475335827102,
+        "kp": 625.7901343308408,
+        "kv": 62.57901343308408,
+        "armature": 0.0782237667913551,
+        "effort_limit_nm": 150.0,
+        "max_torque_nm": 19.015233059423906,
+        "torque_use": 0.12676822039615937,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.02338995549285114
+      },
+      {
+        "name": "R_arm_j3",
+        "inertia_kg_m2": 0.507433884699567,
+        "kp": 202.9735538798268,
+        "kv": 20.297355387982677,
+        "armature": 0.02537169423497835,
+        "effort_limit_nm": 80.0,
+        "max_torque_nm": 10.918061496372221,
+        "torque_use": 0.13647576870465278,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.04210270154690729
+      },
+      {
+        "name": "R_arm_j4",
+        "inertia_kg_m2": 0.5652940229369325,
+        "kp": 226.117609174773,
+        "kv": 22.6117609174773,
+        "armature": 0.02826470114684663,
+        "effort_limit_nm": 80.0,
+        "max_torque_nm": 17.5013329767225,
+        "torque_use": 0.21876666220903127,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.03845182941338621
+      },
+      {
+        "name": "R_arm_j5",
+        "inertia_kg_m2": 0.3017934927876923,
+        "kp": 120.71739711507692,
+        "kv": 12.071739711507693,
+        "armature": 0.015089674639384616,
+        "effort_limit_nm": 25.0,
+        "max_torque_nm": 5.512829267375929,
+        "torque_use": 0.22051317069503718,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.03666134819121401
+      },
+      {
+        "name": "R_arm_j6",
+        "inertia_kg_m2": 0.1687739885093377,
+        "kp": 67.50959540373508,
+        "kv": 6.750959540373508,
+        "armature": 0.008438699425466885,
+        "effort_limit_nm": 25.0,
+        "max_torque_nm": 5.951625423551041,
+        "torque_use": 0.23806501694204166,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.022817091950730006
+      },
+      {
+        "name": "R_arm_j7",
+        "inertia_kg_m2": 0.20308054065339504,
+        "kp": 81.23221626135802,
+        "kv": 8.123221626135802,
+        "armature": 0.010154027032669752,
+        "effort_limit_nm": 25.0,
+        "max_torque_nm": 2.192000795666794,
+        "torque_use": 0.08768003182667176,
+        "saturated_fraction": 0.0,
+        "max_tracking_error_rad": 0.023308973962929302
+      }
+    ],
+    "qpos": [
+      3.651043183320124e-08,
+      1.6542759144561632,
+      -8.880716859055832e-07,
+      -0.6881432485044131,
+      5.83265383931551e-19,
+      0.6881463250189127,
+      -7.1062155848815125e-19,
+      1.1917019430356373,
+      1.8798773644179245,
+      0.1853175034921228,
+      0.0013097956765059705,
+      5.148916395269632e-05,
+      -0.003111642620682273,
+      0.4020660559467603,
+      0.10544638708378912,
+      -0.08293862210727594,
+      -1.0049777638791761,
+      -0.031375843210079704,
+      0.10780741041856634,
+      -0.12701378349305817,
+      -0.4027349729189769,
+      -0.11551219183888185,
+      0.06710520270315162,
+      -1.0047812230403148,
+      0.049287266709024065,
+      -0.10740875949068752,
+      0.11914232351898771,
+      1.3676277609172642,
+      -0.329708195034903,
+      0.248956380520165,
+      0.0003407691022071377,
+      -4.8112038007387815e-08,
+      2.0565508408108516e-08,
+      -0.9999999419382062,
+      1.3676470616332037,
+      0.3297179430925824,
+      0.24895638052014443,
+      -0.00033814725202782847,
+      -3.9282100657627744e-08,
+      -1.9131362001437108e-08,
+      -0.9999999428282151,
+      0.9272907210021089,
+      -0.32961951336568723,
+      0.24895638052022798,
+      0.0002721284885966067,
+      -6.797152773445201e-08,
+      2.5121616281749964e-08,
+      -0.9999999629730388,
+      0.9272874211022079,
+      0.32962648340084255,
+      0.24895638052022745,
+      -0.0002711812462462232,
+      -6.780346345806474e-08,
+      -2.4971055483878808e-08,
+      -0.9999999632303624,
+      1.3677955095487955,
+      -0.32982057320624303,
+      0.3068434400095339,
+      0.0002697466547779941,
+      -1.8682819226420577e-07,
+      7.777146874775834e-08,
+      -0.9999999636183506,
+      1.3677840291723706,
+      0.3298225217915513,
+      0.30684344002374386,
+      -0.00031564014869392925,
+      -1.5251988339029538e-07,
+      -7.237348603275032e-08,
+      -0.9999999501856329,
+      0.9275276894059843,
+      -0.32975677954423965,
+      0.3068434399660906,
+      0.000189584643020157,
+      -2.6402126579435897e-07,
+      9.499965653128563e-08,
+      -0.9999999820287924,
+      0.9275238032430594,
+      0.32976295626234736,
+      0.3068434399666533,
+      -0.00018976825433541768,
+      -2.633677976922371e-07,
+      -9.445129840646776e-08,
+      -0.9999999819939658
+    ],
+    "base_displacement_m": 0.0,
+    "final_heading_rad": 3.651043183320124e-08,
+    "seed": 1867690288,
+    "selection": "ordered",
+    "placements": [
+      {
+        "box": 0,
+        "slot": 0,
+        "level": 0,
+        "expected": [
+          1.3699999999999999,
+          -0.33,
+          0.249
+        ]
+      },
+      {
+        "box": 1,
+        "slot": 1,
+        "level": 0,
+        "expected": [
+          1.3699999999999999,
+          0.33,
+          0.249
+        ]
+      },
+      {
+        "box": 2,
+        "slot": 2,
+        "level": 0,
+        "expected": [
+          0.9299999999999999,
+          -0.33,
+          0.249
+        ]
+      },
+      {
+        "box": 3,
+        "slot": 3,
+        "level": 0,
+        "expected": [
+          0.9299999999999999,
+          0.33,
+          0.249
+        ]
+      },
+      {
+        "box": 4,
+        "slot": 0,
+        "level": 1,
+        "expected": [
+          1.3699999999999999,
+          -0.33,
+          0.30697830390930175
+        ]
+      },
+      {
+        "box": 5,
+        "slot": 1,
+        "level": 1,
+        "expected": [
+          1.3699999999999999,
+          0.33,
+          0.30697830390930175
+        ]
+      },
+      {
+        "box": 6,
+        "slot": 2,
+        "level": 1,
+        "expected": [
+          0.9299999999999999,
+          -0.33,
+          0.30697830390930175
+        ]
+      },
+      {
+        "box": 7,
+        "slot": 3,
+        "level": 1,
+        "expected": [
+          0.9299999999999999,
+          0.33,
+          0.30697830390930175
+        ]
+      }
+    ],
+    "positions": [
+      [
+        1.3676277609172642,
+        -0.329708195034903,
+        0.248956380520165
+      ],
+      [
+        1.3676470616332037,
+        0.3297179430925824,
+        0.24895638052014443
+      ],
+      [
+        0.9272907210021089,
+        -0.32961951336568723,
+        0.24895638052022798
+      ],
+      [
+        0.9272874211022079,
+        0.32962648340084255,
+        0.24895638052022745
+      ],
+      [
+        1.3677955095487955,
+        -0.32982057320624303,
+        0.3068434400095339
+      ],
+      [
+        1.3677840291723706,
+        0.3298225217915513,
+        0.30684344002374386
+      ],
+      [
+        0.9275276894059843,
+        -0.32975677954423965,
+        0.3068434399660906
+      ],
+      [
+        0.9275238032430594,
+        0.32976295626234736,
+        0.3068434399666533
+      ]
+    ],
+    "mode": "turning base on steered wheels; dual hand-hole hooks; RGB-D semantic camera; dynamic robot"
+  }
+}

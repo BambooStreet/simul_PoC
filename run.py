@@ -42,6 +42,12 @@ def main():
     )
     p.add_argument("--selection", choices=["random", "ordered"], default="random")
     p.add_argument(
+        "--mode", choices=["kinematic", "dynamic"], default="kinematic",
+        help="kinematic replays the trajectory into the state (the frozen "
+             "baseline); dynamic drives the 17 torso and arm joints with torque "
+             "actuators (default: kinematic)",
+    )
+    p.add_argument(
         "--camera-image", help="Save latest overhead RGB sensor frame as PNG"
     )
     p.add_argument(
@@ -66,6 +72,7 @@ def main():
         speed=a.speed,
         seed=a.seed,
         selection=a.selection,
+        mode=a.mode,
     )
     try:
         try:
