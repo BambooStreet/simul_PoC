@@ -11,19 +11,20 @@ from .layout import (
     BELT_HALF_WIDTH,
     BELT_START_X,
     BELT_TOP,
-    HANDLE_BOTTOM,
-    HANDLE_HALF_WIDTH,
-    HANDLE_TOP,
     MAX_BOXES,
     NESTING_PITCH,
     PALLET_CENTER,
+    PALLET_HALF_X,
+    PALLET_HALF_Y,
     PALLET_TOP,
     TOTE_HALF_X,
+    TOTE_HALF_Y,
     TOTE_HEIGHT,
+    TOTE_MASS,
     WALL_T,
-    WALL_Y,
 )
-from .props import add_assets, add_pallet_visual, add_tote_visual
+from .props import add_assets, add_pallet_visual
+from .tote import add_tote
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -33,44 +34,6 @@ BASE_Z = 0.0548
 HALF_H = TOTE_HEIGHT / 2
 # Slack between a tote's foot and the walls of the tote it nests into.
 NEST_CLEARANCE = 0.013
-
-
-def add_tote_walls(body, index):
-    """Short end walls carrying the hand hole, plus plain long side walls."""
-    for sign in [-1, 1]:
-        E.SubElement(
-            body,
-            "geom",
-            name=f"tote_side_{index}_{sign}",
-            type="box",
-            pos=f"{sign * TOTE_HALF_X} 0 0",
-            size=f"{WALL_T} {WALL_Y - WALL_T} {HALF_H}",
-            mass=".12",
-            rgba="0 0 0 0",
-            group="3",
-            contype="4",
-            conaffinity="2",
-        )
-        # The lower pane is the ledge the prong rests on once it is seated.
-        for part, z0, z1, x0, x1 in [
-            ("handle", -HALF_H, HANDLE_BOTTOM, -TOTE_HALF_X, TOTE_HALF_X),
-            ("above", HANDLE_TOP, HALF_H, -TOTE_HALF_X, TOTE_HALF_X),
-            ("left", HANDLE_BOTTOM, HANDLE_TOP, -TOTE_HALF_X, -HANDLE_HALF_WIDTH),
-            ("right", HANDLE_BOTTOM, HANDLE_TOP, HANDLE_HALF_WIDTH, TOTE_HALF_X),
-        ]:
-            E.SubElement(
-                body,
-                "geom",
-                name=f"tote_{part}_{index}_{sign}",
-                type="box",
-                pos=f"{(x0 + x1) / 2} {sign * WALL_Y} {(z0 + z1) / 2}",
-                size=f"{(x1 - x0) / 2} {WALL_T} {(z1 - z0) / 2}",
-                mass=".04",
-                rgba="0 0 0 0",
-                group="3",
-                contype="4",
-                conaffinity="2",
-            )
 
 
 def build(count=MAX_BOXES, nesting_pitch=NESTING_PITCH, mode="kinematic",
@@ -128,7 +91,7 @@ def build(count=MAX_BOXES, nesting_pitch=NESTING_PITCH, mode="kinematic",
         name="pallet",
         type="box",
         pos=f"{PALLET_CENTER[0]} {PALLET_CENTER[1]} {PALLET_TOP / 2}",
-        size=f".5 .6 {PALLET_TOP / 2}",
+        size=f"{PALLET_HALF_X} {PALLET_HALF_Y} {PALLET_TOP / 2}",
         rgba="0 0 0 0",
         group="3",
         contype="1",
@@ -186,16 +149,15 @@ def build(count=MAX_BOXES, nesting_pitch=NESTING_PITCH, mode="kinematic",
             type="box",
             pos=f"0 0 {-HALF_H + nesting_pitch / 2}",
             size=f"{TOTE_HALF_X - WALL_T - NEST_CLEARANCE} "
-                 f"{WALL_Y - WALL_T - NEST_CLEARANCE} {nesting_pitch / 2}",
-            mass="1.5",
+                 f"{TOTE_HALF_Y - WALL_T - NEST_CLEARANCE} {nesting_pitch / 2}",
+            mass=f"{TOTE_MASS / 2:.5f}",
             rgba="0 0 0 0",
             group="3",
             friction=".8 .01 .001",
             contype="1",
             conaffinity="7",
         )
-        add_tote_walls(b, i)
-        add_tote_visual(b, i)
+        add_tote(b, i)
         for side in ["L", "R"]:
             E.SubElement(
                 eq,

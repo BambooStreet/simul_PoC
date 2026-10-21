@@ -4,27 +4,32 @@ import mujoco
 import numpy as np
 
 from poc_sim.gripper import (
+    ENGAGE_DEPTH,
     GRIP_Z,
     INSERT_LIFT,
-    PRONG_HALF_HEIGHT,
+    PLATE_FRONT,
     SPAN_HOLD,
     SPAN_OPEN,
+    THICK,
+    TONGUE_LENGTH,
 )
 from poc_sim.ik import REFERENCE_ROT
 from poc_sim.layout import (
     BELT_HEADING,
     CARRY,
+    COLLAR_OUTER,
     HANDLE_BOTTOM,
     HANDLE_TOP,
+    HOLE_CLEAR_HEIGHT,
     LAYER_LIMIT,
     NESTING_PITCH,
     PALLET_TOP,
     PICK,
     SLOTS,
+    TOTE_HALF_Y,
     TOTE_HEIGHT,
 )
 from poc_sim.drive import IDEALISED_JOINTS, TORQUE_JOINTS, urdf_efforts
-from poc_sim.props import HOOK_NOSE_X, HOOK_PRONG_X, RIM_HALF_Y
 from poc_sim.scene import ROOT, URDF_RELATIVE, build
 from poc_sim.simulation import STACK_CLEARANCE, Simulation
 
@@ -58,16 +63,35 @@ class BaselineChecks(unittest.TestCase):
             actual = s.ik.d.site_xmat[s.ik.sites[k]].reshape(3, 3)
             self.assertLess(np.abs(actual - REFERENCE_ROT[side]).max(), 0.01, side)
 
-    def test_hand_hole_stays_reachable_once_nested(self):
-        """A nested tote must not bury its hand hole under the rim below it."""
-        self.assertGreater(
-            HANDLE_BOTTOM, TOTE_HEIGHT / 2 - NESTING_PITCH,
-            "prong would be trapped under the previous tote's rim",
-        )
-        self.assertGreaterEqual(GRIP_Z - PRONG_HALF_HEIGHT, HANDLE_BOTTOM)
-        self.assertLessEqual(GRIP_Z + INSERT_LIFT + PRONG_HALF_HEIGHT, HANDLE_TOP)
-        # Opening the hooks has to pull the nose clear of the widest part of the tote.
-        self.assertGreater(SPAN_OPEN - (HOOK_NOSE_X - HOOK_PRONG_X), RIM_HALF_Y)
+    def test_tongue_fits_the_part_of_the_hole_a_nested_tote_leaves_clear(self):
+        """The measured tote buries most of its own hand hole once nested.
+
+        The hole starts 47 mm below the rim and the nesting pitch is 58 mm, so
+        the rim of the tote underneath covers everything below 11 mm. The tongue
+        has to live in that band or it cannot be withdrawn after seating.
+        """
+        rim_below = TOTE_HEIGHT / 2 - NESTING_PITCH
+        self.assertLess(HANDLE_BOTTOM, rim_below, "the measured hole is buried")
+        self.assertAlmostEqual(HOLE_CLEAR_HEIGHT, HANDLE_TOP - rim_below, places=9)
+        tongue_bottom, tongue_top = GRIP_Z - THICK, GRIP_Z
+        self.assertGreater(tongue_bottom, rim_below,
+                           "tongue would be trapped behind the rim below")
+        self.assertLessEqual(tongue_top, HANDLE_TOP)
+        self.assertGreater(THICK, 0)
+        self.assertLess(THICK, HOLE_CLEAR_HEIGHT)
+
+    def test_opening_pulls_the_tongue_clear_of_the_wall(self):
+        self.assertGreater(SPAN_OPEN - TONGUE_LENGTH, TOTE_HALF_Y,
+                           "tongue tip still inside the wall when open")
+        self.assertGreater(ENGAGE_DEPTH, 0.01, "too little tongue inside the hole")
+
+    def test_plate_stands_outside_the_collar(self):
+        """The lip is proud of the hand-hole wall, so the plate cannot hug it."""
+        # The plate's inner face is PLATE_FRONT (negative, i.e. outboard) from the
+        # tool origin, so it sits further out than the span itself.
+        plate_inner = SPAN_HOLD - PLATE_FRONT
+        self.assertGreater(plate_inner, COLLAR_OUTER,
+                           "plate would be buried in the collar")
 
     def test_top_layer_is_reachable_at_both_spans(self):
         s = self.sim

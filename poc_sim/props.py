@@ -1,7 +1,9 @@
-"""Procedural visual meshes for a photo-referenced industrial nesting tote/pallet.
+"""Procedural visual mesh for the pallet.
 
-Dimensions are supplied by the user; details are approximations, not vendor CAD.
-All visual geoms are massless and noncolliding. The scene owns contact proxies.
+The tote and the gripper are now built from measured dimensions as plain boxes in
+`tote.py` and `gripper.py`, where the same boxes serve as both collision and what
+the camera sees. Only the pallet still wants a mesh, because its lattice is scenery
+rather than anything the robot interacts with.
 """
 
 import math
@@ -10,26 +12,10 @@ from pathlib import Path
 
 import numpy as np
 
-from .layout import (
-    HANDLE_BOTTOM,
-    HANDLE_HALF_WIDTH,
-    HANDLE_TOP,
-    PALLET_TOP,
-    TOTE_HEIGHT,
-)
+from .layout import PALLET_HALF_X, PALLET_HALF_Y, PALLET_TOP
 
 PROP_DIR = Path(__file__).resolve().parents[1] / "assets" / "props"
 
-TOTE_HALF_H = TOTE_HEIGHT / 2
-# Rolled lip top; the depth camera reads stack height off this surface.
-RIM_TOP = TOTE_HALF_H
-# Widest point of the tote: the rolled lip over the short end walls.
-RIM_HALF_Y = 0.25
-
-# Hook tool, in the tool frame of poc_sim.gripper: +X inboard, +Z up.
-HOOK_PRONG_X = 0.090
-HOOK_PRONG_Z = -0.1955
-HOOK_NOSE_X = 0.126
 
 
 class Mesh:
@@ -160,119 +146,18 @@ def rounded_rectangle(hx, hy, radius, z):
     return points
 
 
-def tote_shell():
-    mesh = Mesh()
-    base = -TOTE_HALF_H
-    levels = [base, base + 0.006, HANDLE_BOTTOM, HANDLE_TOP, TOTE_HALF_H]
-    span = levels[-1] - base
-    n = len(rounded_rectangle(0.17, 0.22, 0.016, 0))
-    for inner in [False, True]:
-        for z in levels:
-            f = (z - base) / span
-            hx = 0.17 + 0.020 * f
-            hy = 0.22 + 0.020 * f
-            r = 0.016 + 0.004 * f
-            if inner:
-                hx -= 0.0025
-                hy -= 0.0025
-                r -= 0.0025
-            mesh.vertices.extend(rounded_rectangle(hx, hy, r, z))
-    layers = len(levels)
-    offset = layers * n
-    occupied = {}
-    for k in range(layers - 1):
-        for j in range(n):
-            v = np.mean(
-                [mesh.vertices[k * n + j], mesh.vertices[k * n + (j + 1) % n]], axis=0
-            )
-            # Hand openings in both short end walls, below the yellow bars; the
-            # band between levels 2 and 3 is exactly the hole the prong enters.
-            hole = k == 2 and abs(v[1]) > 0.225 and abs(v[0]) < HANDLE_HALF_WIDTH
-            occupied[k, j] = not hole
-            if hole:
-                continue
-            a = k * n + j
-            b = k * n + (j + 1) % n
-            c = (k + 1) * n + (j + 1) % n
-            d = (k + 1) * n + j
-            mesh.quad(a, b, c, d)
-            mesh.quad(offset + d, offset + c, offset + b, offset + a)
-    for (k, j), present in occupied.items():
-        if not present:
-            continue
-        a = k * n + j
-        b = k * n + (j + 1) % n
-        c = (k + 1) * n + (j + 1) % n
-        d = (k + 1) * n + j
-        for neighbor, edge in [
-            ((k - 1, j), (b, a)),
-            ((k + 1, j), (d, c)),
-            ((k, (j - 1) % n), (a, d)),
-            ((k, (j + 1) % n), (c, b)),
-        ]:
-            if not occupied.get(neighbor, False):
-                u, v = edge
-                mesh.quad(u, v, offset + v, offset + u)
-    mesh.rounded_slab(0.17, 0.22, 0.016, base, base + 0.006)
-    return mesh
-
-
-def hook_tool():
-    """L-shaped handle hook: wrist plate, outboard column, inserted prong."""
-    mesh = Mesh()
-    z = HOOK_PRONG_Z
-    mesh.loft(
-        2,
-        [
-            (0.0, 0.010, 0.0, 0.055, 0.052),
-            (-0.026, 0.010, 0.0, 0.055, 0.052),
-            (-0.040, 0.019, 0.0, 0.044, 0.050),
-            (-0.075, 0.0275, 0.0, 0.030, 0.048),
-            (-0.140, 0.0275, 0.0, 0.020, 0.045),
-            (z + 0.010, 0.0275, 0.0, 0.020, 0.043),
-        ],
-    )
-    mesh.loft(
-        0,
-        [
-            (0.0075, 0.0, z, 0.043, 0.0105),
-            (0.055, 0.0, z, 0.042, 0.0100),
-            (0.105, 0.0, z, 0.041, 0.0095),
-            (HOOK_NOSE_X, 0.0, z + 0.0035, 0.032, 0.0055),
-        ],
-    )
-    return mesh
-
-
 def make_meshes():
     PROP_DIR.mkdir(parents=True, exist_ok=True)
-    shell = tote_shell()
-    rim = Mesh()
-    # Upper rolled lip, lower reinforcing bead, and shoulder support flange.
-    rim.ring(0.20, RIM_HALF_Y, 0.023, RIM_TOP - 0.009, 0.1905, 0.2405, 0.0135, 0.009)
-    rim.ring(0.196, 0.246, 0.022, RIM_TOP - 0.034, 0.187, 0.237, 0.013, 0.007)
-    rim.ring(0.195, 0.245, 0.022, RIM_TOP - 0.027, 0.187, 0.237, 0.014, 0.010)
-    ribs = Mesh()
-    # Shallow external moulding ribs, under the rim, inside the specified envelope.
-    z = -0.01
-    taper = 0.020 / (TOTE_HALF_H * 2)
-    for sign in [-1, 1]:
-        for y in [-0.195, -0.14, -0.085, 0.085, 0.14, 0.195]:
-            x = sign * (0.17 + taper * (z + TOTE_HALF_H) + 0.001)
-            ribs.slanted_box([x, y, z], [0.0014, 0.0024, 0.09], 0, sign * taper)
-        for x in [-0.135, -0.08, 0.08, 0.135]:
-            y = sign * (0.22 + taper * (z + TOTE_HALF_H) + 0.001)
-            ribs.slanted_box([x, y, z], [0.0024, 0.0014, 0.09], 1, sign * taper)
     pallet = Mesh()
     # 1000 x 1200 x 123 mm; nine feet, three runners, open fork pockets.
     deck = PALLET_TOP - 0.023
     for x in [-0.43, 0, 0.43]:
-        pallet.box([x, 0, 0.009], [0.07, 0.6, 0.009])
+        pallet.box([x, 0, 0.009], [0.07, PALLET_HALF_Y, 0.009])
         for y in [-0.52, 0, 0.52]:
             pallet.box([x, y, (0.018 + deck) / 2], [0.07, 0.08, (deck - 0.018) / 2])
     for y in [-0.565, 0.565]:
-        pallet.box([0, y, 0.009], [0.5, 0.035, 0.009])
-    pallet.ring(0.5, 0.6, 0.018, deck, 0.472, 0.572, 0.006, 0.023)
+        pallet.box([0, y, 0.009], [PALLET_HALF_X, 0.035, 0.009])
+    pallet.ring(PALLET_HALF_X, PALLET_HALF_Y, 0.018, deck, 0.472, 0.572, 0.006, 0.023)
     for x in [-0.3, -0.1, 0.1, 0.3]:
         pallet.box([x, 0, PALLET_TOP - 0.014], [0.012, 0.572, 0.014])
     for y in [-0.4, -0.2, 0, 0.2, 0.4]:
@@ -281,29 +166,13 @@ def make_meshes():
         pallet.box([x, 0, PALLET_TOP - 0.007], [0.004, 0.572, 0.007])
     for y in np.linspace(-0.56, 0.56, 25):
         pallet.box([0, y, PALLET_TOP - 0.007], [0.472, 0.004, 0.007])
-    return {
-        name: mesh.write(name)
-        for name, mesh in [
-            ("tote_shell", shell),
-            ("tote_rim", rim),
-            ("tote_ribs", ribs),
-            ("pallet_lattice", pallet),
-            ("hook_tool", hook_tool()),
-        ]
-    }
+    return {"pallet_lattice": pallet.write("pallet_lattice")}
 
 
 def add_assets(asset):
     for name, path in make_meshes().items():
         E.SubElement(asset, "mesh", name=name, file=str(path))
-    for name, rgba in [
-        ("tote_plastic", ".075 .055 .27 1"),
-        ("tote_edges", ".11 .08 .34 1"),
-        ("tote_bar", ".98 .69 .035 1"),
-        ("pallet_plastic", ".035 .26 .13 1"),
-        ("tool_shell", ".085 .09 .105 1"),
-        ("tool_metal", ".40 .43 .48 1"),
-    ]:
+    for name, rgba in [("pallet_plastic", ".035 .26 .13 1")]:
         E.SubElement(
             asset,
             "material",
@@ -315,95 +184,10 @@ def add_assets(asset):
         )
 
 
-def hook_tool_geoms(side):
-    """Visual shell of one printed handle hook; gripper.py owns its contact boxes."""
-    geoms = [
-        {"name": f"{side}_hook_shell", "type": "mesh", "mesh": "hook_tool",
-         "material": "tool_shell"},
-        {"name": f"{side}_hook_boss", "type": "cylinder", "pos": "0.01 0 -0.022",
-         "size": "0.040 0.006", "material": "tool_metal"},
-    ]
-    # Bolt circle on the wrist plate, on the part the column does not cover.
-    for k in range(10):
-        a = 2 * math.pi * (k + 0.5) / 10
-        geoms.append({
-            "type": "cylinder",
-            "pos": f"{0.01 + 0.030 * math.cos(a)} {0.030 * math.sin(a)} -0.0275",
-            "size": "0.0045 0.0015",
-            "rgba": ".03 .03 .035 1",
-        })
-    for x, y in [(-0.035, 0.034), (-0.035, -0.034), (0.057, 0.034), (0.057, -0.034)]:
-        geoms.append({
-            "type": "cylinder", "pos": f"{x} {y} -0.0275", "size": "0.005 0.0015",
-            "rgba": ".03 .03 .035 1",
-        })
-    for g in geoms:
-        g.update(contype="0", conaffinity="0", mass="0", group="1")
-    return geoms
-
-
 def visual_geom(parent, **kwargs):
     return E.SubElement(
         parent, "geom", contype="0", conaffinity="0", mass="0", group="1", **kwargs
     )
-
-
-def add_tote_visual(body, index):
-    for part, material in [
-        ("shell", "tote_plastic"),
-        ("rim", "tote_edges"),
-        ("ribs", "tote_edges"),
-    ]:
-        visual_geom(
-            body,
-            name=f"tote_visual_{index}_{part}",
-            type="mesh",
-            mesh=f"tote_{part}",
-            material=material,
-        )
-    for side in [-1, 1]:
-        y = side * 0.245
-        bar = round(RIM_TOP - 0.006, 4)
-        visual_geom(
-            body,
-            type="capsule",
-            fromto=f"-.173 {y} {bar} .173 {y} {bar}",
-            size=".005",
-            material="tote_bar",
-        )
-        for x in [-0.18, 0.18]:
-            visual_geom(
-                body,
-                type="box",
-                pos=f"{x} {y} {bar}",
-                size=".009 .0045 .005",
-                material="tote_bar",
-            )
-        for x in [-0.12, 0, 0.12]:
-            visual_geom(
-                body,
-                type="box",
-                pos=f"{x} {y} {bar}",
-                size=".014 .0045 .005",
-                material="tote_bar",
-            )
-    # Recessed label plaque and an abstract inventory barcode (not a vendor ID).
-    visual_geom(
-        body,
-        type="box",
-        pos="-.1845 -.105 .024",
-        size=".001 .040 .025",
-        rgba=".84 .85 .81 1",
-    )
-    for k in range(19):
-        y = -0.140 + k * 0.0037
-        visual_geom(
-            body,
-            type="box",
-            pos=f"-.1856 {y} .024",
-            size=f".0002 {(0.0005 if k % 3 else 0.0009)} .019",
-            rgba=".04 .045 .05 1",
-        )
 
 
 def add_pallet_visual(world, pos=(1.15, 0, 0)):

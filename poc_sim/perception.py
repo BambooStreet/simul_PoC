@@ -4,10 +4,10 @@ import mujoco
 import numpy as np
 
 from .layout import PALLET_TOP, SLOTS, TOTE_HEIGHT
-from .props import RIM_TOP
 
-# Height of a tote's upper rim above its body centre, as the depth camera sees it.
-RIM_OFFSET = RIM_TOP
+# A tote's rim sits half a body height above its centre, and that surface is what
+# the depth camera returns.
+RIM_OFFSET = TOTE_HEIGHT / 2
 
 
 class OverheadCamera:
@@ -18,12 +18,21 @@ class OverheadCamera:
         self.renderer = mujoco.Renderer(model, height=size, width=size)
         self.camera = model.camera("overhead").id
         # Simulator-provided semantic mask, not a learned vision detector.
+        # Segment on the tote bodies rather than on a geom naming convention, so
+        # the shell can be rebuilt without the camera losing sight of it.
+        # Shell bodies only. A lid folded out hangs below its own rim on the
+        # outside of the stack, so counting it would read the wrong height.
+        totes = {
+            model.body(b).id
+            for b in range(model.nbody)
+            if (model.body(b).name or "").startswith("tote_")
+            and model.body(b).name.rsplit("_", 1)[-1].isdigit()
+            and "lid" not in model.body(b).name
+        }
         self.tote_geoms = np.array(
-            [
-                g
-                for g in range(model.ngeom)
-                if model.geom(g).name.startswith("tote_visual_")
-            ]
+            [g for g in range(model.ngeom)
+             if int(model.geom_bodyid[g]) in totes
+             and model.geom_group[g] != 1]
         )
         self.latest = None
 

@@ -1,0 +1,74 @@
+{
+  "pallet": {
+    "top": {"value": 0.123, "unit": "m", "source": "site_measurement",
+      "note": "팔레트 윗면 높이. 사용자 전달."},
+    "half_x": {"value": 0.5, "unit": "m", "source": "site_measurement",
+      "note": "1000 mm 깊이의 절반. 로봇에서 멀어지는 방향."},
+    "half_y": {"value": 0.6, "unit": "m", "source": "site_measurement",
+      "note": "1200 mm 폭의 절반. 로봇 좌우 방향."},
+    "center_x": {"value": 1.15, "unit": "m", "source": "design_choice",
+      "note": "베이스 원점에서 팔레트 중심까지. 15층 검토에서 다시 정해질 값."}
+  },
+  "tote": {
+    "body_length": {"value": 0.446, "unit": "m", "source": "site_measurement",
+      "note": "구멍 있는 짧은 벽 사이 바깥 길이(몸통 기준). 띠는 여기서 더 튀어나온다."},
+    "body_width": {"value": 0.400, "unit": "m", "source": "site_measurement",
+      "note": "긴 벽 사이. 구멍 없는 방향."},
+    "body_height": {"value": 0.252, "unit": "m", "source": "site_measurement",
+      "note": "바닥에서 테두리 윗면까지."},
+    "wall_thickness": {"value": 0.004, "unit": "m", "source": "estimated",
+      "note": "측정하지 않음. 벽 두께가 후크 혀의 삽입 깊이 여유를 결정한다."},
+    "nesting_pitch": {"value": 0.058, "unit": "m", "source": "site_measurement",
+      "note": "중첩 1개당 증가 높이. 단차 없이 맞물린다. 사용자 전달."},
+    "mass": {"value": 1.5, "unit": "kg", "source": "estimated",
+      "note": "빈 토트. 실측 없음."}
+  },
+  "hand_hole": {
+    "width": {"value": 0.105, "unit": "m", "source": "site_measurement",
+      "note": "열린 부분 가로. 10/20 줄자 실측."},
+    "height": {"value": 0.030, "unit": "m", "source": "site_measurement",
+      "note": "열린 부분 세로."},
+    "top_below_rim": {"value": 0.047, "unit": "m", "source": "site_measurement",
+      "note": "구멍 윗변이 테두리 윗면에서 아래로. 중첩 pitch 58 mm보다 작아야 포갠 뒤 혀를 뺄 수 있는데, 47 + 30 = 77 mm라 구멍 아래쪽 19 mm는 아래 토트 테두리에 가린다. 혀 두께가 여기서 제한된다."}
+  },
+  "collar": {
+    "overhang": {"value": 0.023, "unit": "m", "source": "site_measurement",
+      "note": "띠(테두리) 바깥 면이 몸통 벽 바깥면보다 튀어나온 거리."},
+    "drop": {"value": 0.062, "unit": "m", "source": "site_measurement",
+      "note": "테두리 윗면에서 띠 아랫끝까지."},
+    "arch_half_width": {"value": 0.0575, "unit": "m", "source": "site_measurement",
+      "note": "가운데 아치 홈의 반폭. 이 구간은 띠가 위쪽 45 mm만 남는다."},
+    "arch_height": {"value": 0.045, "unit": "m", "source": "site_measurement",
+      "note": "아치 홈 구간에 남는 띠 높이."}
+  },
+  "lid": {
+    "depth": {"value": 0.060, "unit": "m", "source": "site_measurement",
+      "note": "힌지 핀에서 자유단까지. 닫히면 안쪽 수평, 열리면 바깥으로 벽을 따라 내려온다."},
+    "thickness": {"value": 0.014, "unit": "m", "source": "site_measurement",
+      "note": "리브 위쪽은 더 두껍다. 얇은 쪽 값."},
+    "notch_width": {"value": 0.155, "unit": "m", "source": "site_measurement",
+      "note": "가운데 홈 폭. E2의 이빨 3개가 여기에 들어간다."},
+    "notch_depth": {"value": 0.024, "unit": "m", "source": "site_measurement",
+      "note": "홈 깊이. 자유단 쪽만 열리고 힌지 쪽 띠는 이어진다."},
+    "mass": {"value": 0.03, "unit": "kg", "source": "estimated",
+      "note": "덮개 한 장. 실측 없음."},
+    "open_angle": {"value": 270.0, "unit": "deg", "source": "design_choice",
+      "note": "바깥으로 완전히 넘어간 상태. 0도는 안쪽으로 닫힘."}
+  },
+  "slots": {
+    "pitch_x": {"value": 0.44, "unit": "m", "source": "design_choice",
+      "note": "앞뒤 두 줄 간격. 15층 검토에서 다시 정해질 값."},
+    "pitch_y": {"value": 0.66, "unit": "m", "source": "design_choice",
+      "note": "좌우 두 열 간격. 토트 폭이 아니라 후크가 옆 열과 간섭 없이 빠져나올 공간이 정한다."},
+    "layer_limit": {"value": 8, "unit": "layers", "source": "measured_in_sim",
+      "note": "현재 후크·추정 토트 기준 상한. 먼 열 위를 토트 들고 지나갈 수 있는 높이로 결정된다. E2와 실측 토트로 다시 측정해야 한다 — 목표는 15층."}
+  },
+  "conveyor": {
+    "top": {"value": 0.525, "unit": "m", "source": "design_choice",
+      "note": "벨트 윗면 높이."},
+    "half_width": {"value": 0.30, "unit": "m", "source": "design_choice"},
+    "start_x": {"value": -2.15, "unit": "m", "source": "design_choice"},
+    "end_x": {"value": -0.47, "unit": "m", "source": "design_choice"},
+    "feed_speed": {"value": 0.15, "unit": "m/s", "source": "design_choice"}
+  }
+}

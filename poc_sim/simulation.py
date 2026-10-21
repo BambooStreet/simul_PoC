@@ -19,6 +19,7 @@ from .layout import (
     FEED_START,
     FEED_WAIT,
     LAYER_LIMIT,
+    LID_OPEN_ANGLE,
     MAX_BOXES,
     NESTING_PITCH,
     PALLET_HEADING,
@@ -157,6 +158,14 @@ class Simulation:
             self.m.geom_contype[geoms] = 0
             self.m.geom_conaffinity[geoms] = 0
             self.m.body_gravcomp[body] = 1
+            # Totes mostly arrive with their lids already folded out, which is
+            # what the hooks need. Opening a lid that arrived closed is a
+            # separate motion the gripper is shaped for but that is not written
+            # yet, so every tote starts open.
+            for sy in (-1, 1):
+                self.d.qpos[int(self.m.joint(f"lid_{i}_{sy}").qposadr[0])] = (
+                    math.radians(LID_OPEN_ANGLE)
+                )
         mujoco.mj_forward(self.m, self.d)
         if viewer:
             from mujoco import viewer as mj_viewer
